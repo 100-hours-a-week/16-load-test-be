@@ -1,0 +1,56 @@
+name: Backend Dev Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - feat/dev-cicd
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    environment: dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem
+          cat <<EOF > ~/.ssh/config
+          Host dev-backend
+            HostName ${{ secrets.SSH_HOST }}
+            User ec2-user
+            IdentityFile ~/.ssh/deploy_key.pem
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+
+      - name: Copy backend files to server
+        run: |
+          ssh dev-backend "mkdir -p ~/backend"
+          scp -r ./backend/* dev-backend:~/backend/
+
+      - name: Inject .env on server
+        run: |
+          ssh dev-backend <<'EOF'
+            cat <<ENV > ~/backend/.env
+            MONGO_URI=${{ secrets.MONGO_URI }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+            PASSWORD_SALT=${{ secrets.PASSWORD_SALT }}
+            PORT=5000
+            ENV
+          EOF
+
+      - name: Restart backend service
+        run: |
+          ssh dev-backend <<'EOF'
+            cd ~/backend
+            pm2 delete backend || true
+            pm2 start server.js --name backend --env production
+          EOF
