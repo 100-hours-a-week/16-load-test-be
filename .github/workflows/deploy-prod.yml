@@ -56,7 +56,8 @@ jobs:
             npm ci
           EOF
 
-      - name: Run PM2 processes on ports 5000 and 5001
+
+      - name: Generate and upload .env files
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -65,22 +66,26 @@ jobs:
           PASSWORD_SALT: ${{ secrets.PASSWORD_SALT }}
         run: |
           for PORT in 5000 5001; do
-            ssh backend <<'EOF'
-              cd ~/backend
-
-              echo "Injecting .env for PORT=\$PORT"
-              cat > .env <<ENV
-              MONGO_URI=${MONGO_URI}
-              JWT_SECRET=${JWT_SECRET}
-              OPENAI_API_KEY=${OPENAI_API_KEY}
-              ENCRYPTION_KEY=${ENCRYPTION_KEY}
-              PASSWORD_SALT=${PASSWORD_SALT}
-              PORT=${PORT}
-              ENV
-
-
-              echo "Restarting PM2 for port \$PORT"
-              pm2 delete backend-\$PORT || true
-              pm2 start server.js --name backend-\$PORT --env production -- PORT=\$PORT
+            echo "Generating .env for port ${PORT}"
+            cat > .env.${PORT} <<EOF
+            MONGO_URI=${MONGO_URI}
+            JWT_SECRET=${JWT_SECRET}
+            OPENAI_API_KEY=${OPENAI_API_KEY}
+            ENCRYPTION_KEY=${ENCRYPTION_KEY}
+            PASSWORD_SALT=${PASSWORD_SALT}
+            PORT=${PORT}
             EOF
+
+            scp .env.${PORT} backend:~/backend/.env.${PORT}
+          done
+
+      - name: Start PM2 with uploaded .env files
+        run: |
+          for PORT in 5000 5001; do
+            ssh backend "
+              cd ~/backend &&
+              mv .env.${PORT} .env &&
+              pm2 delete backend-${PORT} || true &&
+              pm2 start server.js --name backend-${PORT} --env production -- PORT=${PORT}
+            "
           done
