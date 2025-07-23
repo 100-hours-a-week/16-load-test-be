@@ -57,21 +57,30 @@ jobs:
           EOF
 
       - name: Run PM2 processes on ports 5000 and 5001
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          PASSWORD_SALT: ${{ secrets.PASSWORD_SALT }}
         run: |
           for PORT in 5000 5001; do
             ssh backend <<'EOF'
               cd ~/backend
 
               echo "Injecting .env for PORT=\$PORT"
-              echo "MONGO_URI=${{ secrets.MONGO_URI }}" > .env
-              echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-              echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
-              echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" >> .env
-              echo "PASSWORD_SALT=${{ secrets.PASSWORD_SALT }}" >> .env
-              echo "PORT=\$PORT" >> .env
+              cat > .env <<ENV
+              MONGO_URI=${MONGO_URI}
+              JWT_SECRET=${JWT_SECRET}
+              OPENAI_API_KEY=${OPENAI_API_KEY}
+              ENCRYPTION_KEY=${ENCRYPTION_KEY}
+              PASSWORD_SALT=${PASSWORD_SALT}
+              PORT=${PORT}
+              ENV
+
 
               echo "Restarting PM2 for port \$PORT"
               pm2 delete backend-\$PORT || true
               pm2 start server.js --name backend-\$PORT --env production -- PORT=\$PORT
-            'EOF'
+            EOF
           done
