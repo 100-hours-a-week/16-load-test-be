@@ -59,7 +59,7 @@ jobs:
       - name: Run PM2 processes on ports 5000 and 5001
         run: |
           for PORT in 5000 5001; do
-            ssh backend <<EOF
+            ssh backend <<'EOF'
               cd ~/backend
 
               echo "Injecting .env for PORT=\$PORT"
