@@ -1,13 +1,9 @@
 name: Backend Dev Deploy
 
-# on:
-#   push:
-#     branches:
-#       - main
-
 on:
-  workflow_dispatch:
-
+  push:
+    branches:
+      - main
 
 jobs:
   deploy-dev:
