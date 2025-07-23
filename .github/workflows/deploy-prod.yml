@@ -73,5 +73,5 @@ jobs:
               echo "Restarting PM2 for port \$PORT"
               pm2 delete backend-\$PORT || true
               pm2 start server.js --name backend-\$PORT --env production -- PORT=\$PORT
-            EOF
+            'EOF'
           done
