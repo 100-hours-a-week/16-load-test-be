@@ -47,6 +47,13 @@ jobs:
             ENV
           EOF
 
+      - name: Install backend dependencies
+        run: |
+          ssh dev-backend <<'EOF'
+            cd ~/backend
+            npm ci
+          EOF
+
       - name: Restart backend service
         run: |
           ssh dev-backend <<'EOF'
