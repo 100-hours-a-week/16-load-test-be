@@ -7,6 +7,7 @@ const { jwtSecret } = require('../config/keys');
 const redisClient = require('../utils/redisClient');
 const SessionService = require('../services/sessionService');
 const aiService = require('../services/aiService');
+const drawService = require('../services/drawService');
 
 module.exports = function(io) {
   const connectedUsers = new Map();
@@ -551,7 +552,12 @@ module.exports = function(io) {
         if (aiMentions.length > 0) {
           for (const ai of aiMentions) {
             const query = content.replace(new RegExp(`@${ai}\\b`, 'g'), '').trim();
-            await handleAIResponse(io, room, ai, query);
+            if (ai === 'davinciAI') {
+              const { id: promptID } = await drawService.savePrompt(query);
+              console.log("프롬프트 ID: ", promptID);
+              break; // 이미지 생성은 다른 ai 불러오지 말자
+            }
+            else {await handleAIResponse(io, room, ai, query);}
           }
         }
 
@@ -823,9 +829,9 @@ module.exports = function(io) {
   function extractAIMentions(content) {
     if (!content) return [];
     
-    const aiTypes = ['wayneAI', 'consultingAI'];
+    const aiTypes = ['wayneAI', 'consultingAI', 'davinciAI'];
     const mentions = new Set();
-    const mentionRegex = /@(wayneAI|consultingAI)\b/g;
+    const mentionRegex = /@(wayneAI|consultingAI|davinciAI)\b/g;
     let match;
     
     while ((match = mentionRegex.exec(content)) !== null) {

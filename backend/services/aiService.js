@@ -33,6 +33,7 @@ class AIService {
         throw new Error('Unknown AI persona');
       }
 
+      // 시스템 프롬프트 생성
       const systemPrompt = `당신은 ${aiPersona.name}입니다.
 역할: ${aiPersona.role}
 특성: ${aiPersona.traits}
@@ -43,7 +44,6 @@ class AIService {
 2. 정확하지 않은 정보는 제공하지 마세요.
 3. 필요한 경우 예시를 들어 설명하세요.
 4. ${aiPersona.tone}을 유지하세요.`;
-
       callbacks.onStart();
 
       const response = await this.openaiClient.post('/chat/completions', {
