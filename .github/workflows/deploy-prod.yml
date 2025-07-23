@@ -1,8 +1,5 @@
 name: Backend Production CI/CD
 
-# on:
-#   workflow_dispatch:
-
 on:
   push:
     branches:
@@ -13,12 +10,10 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: prod
-    env:
-      PROD_SERVER_IPS: ${{ secrets.SERVER_IPS }}
 
     strategy:
       matrix:
-        ip: ["10.0.10.115", "10.0.10.250"]
+        ip: [ "10.0.10.115", "10.0.10.250" ]
 
     steps:
       - name: Checkout repository
@@ -28,42 +23,35 @@ jobs:
         run: |
           mkdir -p ~/.ssh
 
-          # SSH keys
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key.pem
           echo "${{ secrets.JUMP_SSH_PRIVATE_KEY }}" > ~/.ssh/jump_key.pem
           chmod 600 ~/.ssh/deploy_key.pem ~/.ssh/jump_key.pem
 
-          # SSH config
           cat <<EOF > ~/.ssh/config
           Host jump-server
-            HostName ${{ secrets.JUMP_HOST }}
-            User ec2-user
-            IdentityFile ~/.ssh/jump_key.pem
-            StrictHostKeyChecking no
-            UserKnownHostsFile /dev/null
-          EOF
+              HostName ${{ secrets.JUMP_HOST }}
+              User ec2-user
+              IdentityFile ~/.ssh/jump_key.pem
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
 
-          for ip in $(echo '${{ env.PROD_SERVER_IPS }}' | jq -r '.[]'); do
-            cat <<EOL >> ~/.ssh/config
-            Host backend-$ip
-              HostName $ip
+          Host backend
+              HostName ${{ matrix.ip }}
               User ec2-user
               IdentityFile ~/.ssh/deploy_key.pem
               ProxyJump jump-server
               StrictHostKeyChecking no
               UserKnownHostsFile /dev/null
-
-            EOL
-          done
+          EOF
 
       - name: Upload backend files to server
         run: |
-          ssh backend-${{ matrix.ip }} "mkdir -p ~/backend"
-          scp -r ./backend/* backend-${{ matrix.ip }}:~/backend/
+          ssh backend "mkdir -p ~/backend"
+          scp -r ./backend/* backend:~/backend/
 
       - name: Install dependencies
         run: |
-          ssh backend-${{ matrix.ip }} <<'EOF'
+          ssh backend <<'EOF'
             cd ~/backend
             npm ci
           EOF
@@ -71,7 +59,7 @@ jobs:
       - name: Run PM2 processes on ports 5000 and 5001
         run: |
           for PORT in 5000 5001; do
-            ssh backend-${{ matrix.ip }} <<EOF
+            ssh backend <<EOF
               echo "Injecting .env for PORT=\$PORT"
               cat <<ENV > ~/backend/.env
               MONGO_URI=${{ secrets.MONGO_URI }}
