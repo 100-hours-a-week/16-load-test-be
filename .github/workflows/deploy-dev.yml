@@ -27,12 +27,10 @@ jobs:
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
           EOF
-
       - name: Copy backend files to server
         run: |
           ssh dev-backend "mkdir -p ~/backend"
           scp -r ./backend/* dev-backend:~/backend/
-
       - name: Inject .env on server
         run: |
           ssh dev-backend <<'EOF'
@@ -45,14 +43,12 @@ jobs:
             PORT=5000
             ENV
           EOF
-
       - name: Install backend dependencies
         run: |
           ssh dev-backend <<'EOF'
             cd ~/backend
             npm ci
           EOF
-
       - name: Restart backend service
         run: |
           ssh dev-backend <<'EOF'

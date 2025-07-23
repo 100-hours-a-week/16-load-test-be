@@ -1,0 +1,86 @@
+name: Backend Production CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+
+    strategy:
+      matrix:
+        ip: [ "10.0.10.115", "10.0.10.250" ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH with ProxyJump
+        run: |
+          mkdir -p ~/.ssh
+
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key.pem
+          echo "${{ secrets.JUMP_SSH_PRIVATE_KEY }}" > ~/.ssh/jump_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem ~/.ssh/jump_key.pem
+
+          cat <<EOF > ~/.ssh/config
+          Host jump-server
+              HostName ${{ secrets.JUMP_HOST }}
+              User ec2-user
+              IdentityFile ~/.ssh/jump_key.pem
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+
+          Host backend
+              HostName ${{ matrix.ip }}
+              User ec2-user
+              IdentityFile ~/.ssh/deploy_key.pem
+              ProxyJump jump-server
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+          EOF
+
+      - name: Upload backend files to server
+        run: |
+          ssh backend "mkdir -p ~/backend"
+          scp -r ./backend/* backend:~/backend/
+
+      - name: Install dependencies
+        run: |
+          ssh backend <<'EOF'
+            cd ~/backend
+            npm ci
+          EOF
+
+
+      - name: Generate and upload .env files
+        env:
+          MONGO_URI: ${{ secrets.MONGO_URI }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          PASSWORD_SALT: ${{ secrets.PASSWORD_SALT }}
+        run: |
+          echo "Generating shared .env file"
+          cat > .env <<EOF
+          MONGO_URI=${MONGO_URI}
+          JWT_SECRET=${JWT_SECRET}
+          OPENAI_API_KEY=${OPENAI_API_KEY}
+          ENCRYPTION_KEY=${ENCRYPTION_KEY}
+          PASSWORD_SALT=${PASSWORD_SALT}
+          EOF
+
+          scp .env backend:~/backend/.env
+
+      - name: Start PM2 processes on ports 5000 and 5001
+        run: |
+          for PORT in 5000 5001; do
+            ssh backend "
+              cd ~/backend &&
+              pm2 delete backend-${PORT} || true &&
+              PORT=${PORT} pm2 start server.js --name backend-${PORT} --env production
+            "
+          done
