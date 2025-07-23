@@ -3,7 +3,6 @@ name: Backend Production CI/CD
 # on:
 #   workflow_dispatch:
 
-
 on:
   push:
     branches:
@@ -19,7 +18,7 @@ jobs:
 
     strategy:
       matrix:
-        ip: ${{ fromJson(env.PROD_SERVER_IPS) }}
+        ip: ["10.0.10.115", "10.0.10.250"]
 
     steps:
       - name: Checkout repository
