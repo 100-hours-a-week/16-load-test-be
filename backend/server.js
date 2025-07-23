@@ -27,7 +27,11 @@ const corsOptions = {
     'https://localhost:3001',
     'https://localhost:3002',
     'http://0.0.0.0:3000',
-    'https://0.0.0.0:3000'
+    'https://0.0.0.0:3000',
+    'https://dev.goorm-ktb-016.goorm.team',
+    'http://dev.goorm-ktb-016.goorm.team',
+    'https://chat.goorm-ktb-016.goorm.team',
+    'http://chat.goorm-ktb-016.goorm.team'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
