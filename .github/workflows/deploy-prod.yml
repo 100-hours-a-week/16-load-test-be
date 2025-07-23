@@ -1,0 +1,91 @@
+name: Backend Production CI/CD
+
+# on:
+#   workflow_dispatch:
+
+
+on:
+  push:
+    branches:
+      - main
+      - feat/prod-cicd
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      PROD_SERVER_IPS: ${{ secrets.SERVER_IPS }}
+
+    strategy:
+      matrix:
+        ip: ${{ fromJson(env.PROD_SERVER_IPS) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH with ProxyJump
+        run: |
+          mkdir -p ~/.ssh
+
+          # SSH keys
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key.pem
+          echo "${{ secrets.JUMP_SSH_PRIVATE_KEY }}" > ~/.ssh/jump_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem ~/.ssh/jump_key.pem
+
+          # SSH config
+          cat <<EOF > ~/.ssh/config
+          Host jump-server
+            HostName ${{ secrets.JUMP_HOST }}
+            User ec2-user
+            IdentityFile ~/.ssh/jump_key.pem
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
+          EOF
+
+          for ip in $(echo '${{ env.PROD_SERVER_IPS }}' | jq -r '.[]'); do
+            cat <<EOL >> ~/.ssh/config
+            Host backend-$ip
+              HostName $ip
+              User ec2-user
+              IdentityFile ~/.ssh/deploy_key.pem
+              ProxyJump jump-server
+              StrictHostKeyChecking no
+              UserKnownHostsFile /dev/null
+
+            EOL
+          done
+
+      - name: Upload backend files to server
+        run: |
+          ssh backend-${{ matrix.ip }} "mkdir -p ~/backend"
+          scp -r ./backend/* backend-${{ matrix.ip }}:~/backend/
+
+      - name: Install dependencies
+        run: |
+          ssh backend-${{ matrix.ip }} <<'EOF'
+            cd ~/backend
+            npm ci
+          EOF
+
+      - name: Run PM2 processes on ports 5000 and 5001
+        run: |
+          for PORT in 5000 5001; do
+            ssh backend-${{ matrix.ip }} <<EOF
+              echo "Injecting .env for PORT=\$PORT"
+              cat <<ENV > ~/backend/.env
+              MONGO_URI=${{ secrets.MONGO_URI }}
+              JWT_SECRET=${{ secrets.JWT_SECRET }}
+              OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+              ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+              PASSWORD_SALT=${{ secrets.PASSWORD_SALT }}
+              PORT=\$PORT
+              ENV
+
+              echo "Restarting PM2 for port \$PORT"
+              cd ~/backend
+              pm2 delete backend-\$PORT || true
+              pm2 start server.js --name backend-\$PORT --env production -- PORT=\$PORT
+            EOF
+          done
