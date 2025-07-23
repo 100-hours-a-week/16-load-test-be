@@ -1,77 +1,58 @@
-name: Backend Production CI/CD
+name: Backend Dev Deploy
 
 on:
   push:
     branches:
       - main
-      - feat/prod-cicd
 
 jobs:
-  deploy:
+  deploy-dev:
     runs-on: ubuntu-latest
-    environment: prod
-
-    strategy:
-      matrix:
-        ip: [ "10.0.10.115", "10.0.10.250" ]
+    environment: dev
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up SSH with ProxyJump
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key.pem
-          echo "${{ secrets.JUMP_SSH_PRIVATE_KEY }}" > ~/.ssh/jump_key.pem
-          chmod 600 ~/.ssh/deploy_key.pem ~/.ssh/jump_key.pem
-
+          chmod 600 ~/.ssh/deploy_key.pem
           cat <<EOF > ~/.ssh/config
-          Host jump-server
-              HostName ${{ secrets.JUMP_HOST }}
-              User ec2-user
-              IdentityFile ~/.ssh/jump_key.pem
-              StrictHostKeyChecking no
-              UserKnownHostsFile /dev/null
-
-          Host backend
-              HostName ${{ matrix.ip }}
-              User ec2-user
-              IdentityFile ~/.ssh/deploy_key.pem
-              ProxyJump jump-server
-              StrictHostKeyChecking no
-              UserKnownHostsFile /dev/null
+          Host dev-backend
+            HostName ${{ secrets.SSH_HOST }}
+            User ec2-user
+            IdentityFile ~/.ssh/deploy_key.pem
+            StrictHostKeyChecking no
+            UserKnownHostsFile /dev/null
           EOF
-
-      - name: Upload backend files to server
+      - name: Copy backend files to server
         run: |
-          ssh backend "mkdir -p ~/backend"
-          scp -r ./backend/* backend:~/backend/
-
-      - name: Install dependencies
+          ssh dev-backend "mkdir -p ~/backend"
+          scp -r ./backend/* dev-backend:~/backend/
+      - name: Inject .env on server
         run: |
-          ssh backend <<'EOF'
+          ssh dev-backend <<'EOF'
+            cat <<ENV > ~/backend/.env
+            MONGO_URI=${{ secrets.MONGO_URI }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+            PASSWORD_SALT=${{ secrets.PASSWORD_SALT }}
+            PORT=5000
+            ENV
+          EOF
+      - name: Install backend dependencies
+        run: |
+          ssh dev-backend <<'EOF'
             cd ~/backend
             npm ci
           EOF
-
-      - name: Run PM2 processes on ports 5000 and 5001
+      - name: Restart backend service
         run: |
-          for PORT in 5000 5001; do
-            ssh backend <<EOF
-              cd ~/backend
-
-              echo "Injecting .env for PORT=\$PORT"
-              echo "MONGO_URI=${{ secrets.MONGO_URI }}" > .env
-              echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
-              echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> .env
-              echo "ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}" >> .env
-              echo "PASSWORD_SALT=${{ secrets.PASSWORD_SALT }}" >> .env
-              echo "PORT=\$PORT" >> .env
-
-              echo "Restarting PM2 for port \$PORT"
-              pm2 delete backend-\$PORT || true
-              pm2 start server.js --name backend-\$PORT --env production -- PORT=\$PORT
-            EOF
-          done
+          ssh dev-backend <<'EOF'
+            cd ~/backend
+            pm2 delete backend || true
+            pm2 start server.js --name backend --env production
+          EOF
