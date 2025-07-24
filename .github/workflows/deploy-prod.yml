@@ -61,6 +61,8 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           PASSWORD_SALT: ${{ secrets.PASSWORD_SALT }}
+          REDIS_HOST: 13.125.133.227
+          REDIS_PORT: 6379
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           echo "Generating shared .env file"
