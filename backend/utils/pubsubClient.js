@@ -4,11 +4,7 @@ const { pubsubHost, redisPort, redisPassword } = require('../config/keys');
 
 // 샤딩 예시용 Redis endpoints (샤드 0~3)
 const PUBSUB_REDIS_HOSTS = [
-  // { host: 'redis-pubsub-0', port: 6379 },
-  // { host: 'redis-pubsub-1', port: 6379 },
-  // { host: 'redis-pubsub-2', port: 6379 },
-  // { host: 'redis-pubsub-3', port: 6379 },
-  { host: pubsubHost, port: redisPort },
+  { host: "13.125.133.227", port: 6379 },
 ];
 
 const subscribers = [];
