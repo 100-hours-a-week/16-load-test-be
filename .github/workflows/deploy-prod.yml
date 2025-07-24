@@ -73,6 +73,7 @@ jobs:
           ENCRYPTION_KEY=${ENCRYPTION_KEY}
           REDIS_HOST=${REDIS_HOST}
           REDIS_PORT=${REDIS_PORT}
+          REDIS_PASSWORD=${REDIS_PASSWORD}
           PASSWORD_SALT=${PASSWORD_SALT}
           EOF
 
