@@ -154,9 +154,9 @@ class AIService {
       temperature: 0.7
     });
 
-    promptText =  response.data.choices[0].message.content.trim();
-    log.Debug(`Generated prompt: ${promptText}`);
-    
+    const promptText = response.data.choices[0].message.content.trim();
+    console.log(`Generated prompt: ${promptText}`);
+
     const payload = {
       id: `prompt-${Date.now()}`,
       userMessage,
