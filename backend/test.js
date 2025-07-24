@@ -1,15 +1,19 @@
-const drawService = require('./services/drawService');
+const aiService = require('./services/aiService');
+import { createClient } from 'redis';
+const redisClient = createClient( {url: ''});
+await redisClient.connect();
+
 
 ( async () => {
     try {
         const userMessage = "노래하는 장원영을 그려줘";
         console.log("메시지: ", userMessage);
 
-        const prompt = await drawService.createPrompt(userMessage);
-        console.log("프롬프트: ", prompt);
+        const payload = await aiService.createDrawingPrompt(userMessage);
+        console.log("payload.json: ", payload);
 
-        const savedPrompt = await drawService.savePrompt(userMessage);
-        console.log("저장된 프롬프트: ", savedPrompt);
+        await redisClient.rpush('test:image:make', JSON.stringify(payload));
+        await redisClient.quit();
 
         process.exit(0);
     } catch (err) {

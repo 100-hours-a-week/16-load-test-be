@@ -7,7 +7,6 @@ const { jwtSecret } = require('../config/keys');
 const redisClient = require('../utils/redisClient');
 const SessionService = require('../services/sessionService');
 const aiService = require('../services/aiService');
-const drawService = require('../services/drawService');
 
 module.exports = function(io) {
   const connectedUsers = new Map();
@@ -553,8 +552,10 @@ module.exports = function(io) {
           for (const ai of aiMentions) {
             const query = content.replace(new RegExp(`@${ai}\\b`, 'g'), '').trim();
             if (ai === 'davinciAI') {
-              const { id: promptID } = await drawService.savePrompt(query);
-              console.log("프롬프트 ID: ", promptID);
+              const drawingPayload = await aiService.createDrawingPrompt(query);
+              // redis에 저장
+              // 그림 완성될 때까지 기다리기
+              // 완성되면 io.to(room).emit
               break; // 이미지 생성은 다른 ai 불러오지 말자
             }
             else {await handleAIResponse(io, room, ai, query);}
