@@ -10,33 +10,24 @@ jobs:
 
     strategy:
       matrix:
-        ip: [ "10.0.10.115", "10.0.10.250" ]
+        ip: [ "13.125.20.44", "43.202.67.1", "43.200.255.131", "3.34.40.75", "3.36.67.250", "3.35.206.138", "13.124.176.167", "13.124.207.254", "3.36.124.142", "52.79.248.241"]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Set up SSH with ProxyJump
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
 
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key.pem
-          echo "${{ secrets.JUMP_SSH_PRIVATE_KEY }}" > ~/.ssh/jump_key.pem
-          chmod 600 ~/.ssh/deploy_key.pem ~/.ssh/jump_key.pem
+          chmod 600 ~/.ssh/deploy_key.pem
 
           cat <<EOF > ~/.ssh/config
-          Host jump-server
-              HostName ${{ secrets.JUMP_HOST }}
-              User ec2-user
-              IdentityFile ~/.ssh/jump_key.pem
-              StrictHostKeyChecking no
-              UserKnownHostsFile /dev/null
-
           Host backend
               HostName ${{ matrix.ip }}
               User ec2-user
               IdentityFile ~/.ssh/deploy_key.pem
-              ProxyJump jump-server
               StrictHostKeyChecking no
               UserKnownHostsFile /dev/null
           EOF
@@ -49,37 +40,41 @@ jobs:
       - name: Install dependencies
         run: |
           ssh backend <<'EOF'
-            cd ~/backend
-            npm ci
+          cd ~/backend
+          npm ci
           EOF
 
-
-      - name: Generate and upload .env files
+      - name: Generate and upload .env file
         env:
           MONGO_URI: ${{ secrets.MONGO_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           PASSWORD_SALT: ${{ secrets.PASSWORD_SALT }}
+          REDIS_HOST: 13.125.133.227
+          REDIS_PORT: 6379
+          PUBSUB_HOST: 10.0.11.63
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
-          echo "Generating shared .env file"
+          echo "Generating .env file"
           cat > .env <<EOF
           MONGO_URI=${MONGO_URI}
           JWT_SECRET=${JWT_SECRET}
           OPENAI_API_KEY=${OPENAI_API_KEY}
           ENCRYPTION_KEY=${ENCRYPTION_KEY}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
+          PUBSUB_HOST=${PUBSUB_HOST}
+          REDIS_PASSWORD=${REDIS_PASSWORD}
           PASSWORD_SALT=${PASSWORD_SALT}
           EOF
 
           scp .env backend:~/backend/.env
 
-      - name: Start PM2 processes on ports 5000 and 5001
+      - name: Start PM2 process on port 5000
         run: |
-          for PORT in 5000 5001; do
-            ssh backend "
-              cd ~/backend &&
-              pm2 delete backend-${PORT} || true &&
-              PORT=${PORT} pm2 start server.js --name backend-${PORT} --env production
-            "
-          done
+          ssh backend "
+            cd ~/backend &&
+            pm2 delete backend-5000 || true &&
+            PORT=5000 pm2 start server.js --name backend-5000 --env production
+          "
