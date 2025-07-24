@@ -4,9 +4,14 @@ const User = require('../models/User');
 const File = require('../models/File');
 const jwt = require('jsonwebtoken');
 const { jwtSecret } = require('../config/keys');
-const redisClient = require('../utils/redisClient');
+// const redisClient = require('../utils/redisClient');
+const pubsub = require('../utils/pubsubClient');
 const SessionService = require('../services/sessionService');
 const aiService = require('../services/aiService');
+
+const subscribedRooms = new Set();
+
+pubsub.setup().catch(err => console.error('PubSub setup error:', err));
 
 module.exports = function(io) {
   const connectedUsers = new Map();
@@ -384,6 +389,14 @@ module.exports = function(io) {
         socket.join(roomId);
         userRooms.set(socket.user.id, roomId);
 
+        if (!subscribedRooms.has(roomId)) {
+          pubsub.subscribeRoom(roomId, (event, payload) => {
+            // Redis 로부터 내려온 이벤트를 방에 emit
+            io.to(roomId).emit(event, payload);
+          });
+          subscribedRooms.add(roomId);
+        }
+
         // 입장 메시지 생성
         const joinMessage = new Message({
           room: roomId,
@@ -546,6 +559,12 @@ module.exports = function(io) {
         ]);
 
         io.to(room).emit('message', message);
+
+        await pubsub.publishMessage(
+          message.room.toString(),  // roomId
+          'message',                // event 이름
+          message                    // payload (full Message object)
+        );
 
         // AI 멘션이 있는 경우 AI 응답 생성
         if (aiMentions.length > 0) {
