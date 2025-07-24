@@ -71,6 +71,8 @@ jobs:
           JWT_SECRET=${JWT_SECRET}
           OPENAI_API_KEY=${OPENAI_API_KEY}
           ENCRYPTION_KEY=${ENCRYPTION_KEY}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
           PASSWORD_SALT=${PASSWORD_SALT}
           EOF
 
