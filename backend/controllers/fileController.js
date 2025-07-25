@@ -8,9 +8,6 @@ const s3Client = new S3Client({
     credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    },
-    signer: {
-        signingAlgorithm: "v4-unsigned-body"
     }
 });
 
@@ -46,7 +43,10 @@ exports.generatePresignedUrl = async (req, res) => {
 
         // 전체 경로(s3Key)를 포함하여 Presigned URL 생성
         const command = new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, ContentType: fileType });
-        const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
+        const presignedUrl = await getSignedUrl(s3Client, command, { 
+            expiresIn: 300,
+            unsignedBody: true // 이 옵션이 핵심입니다!
+        });
 
         res.json({ presignedUrl, fileId: newFile._id });
 
