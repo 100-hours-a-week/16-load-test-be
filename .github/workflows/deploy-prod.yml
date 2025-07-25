@@ -67,7 +67,7 @@ jobs:
           PUBSUB_HOST=${PUBSUB_HOST}
           REDIS_PASSWORD=${REDIS_PASSWORD}
           PASSWORD_SALT=${PASSWORD_SALT}
-          CLOUDFRONT_URL=https://file.goorm-ktb-016.goorm.team/
+          CLOUDFRONT_URL=https://file.goorm-ktb-016.goorm.team
           AWS_REGION=ap-northeast-2
           S3_BUCKET_NAME=ktb-bootcamp-chat-16
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}

@@ -9,6 +9,9 @@ const s3Client = new S3Client({
         accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },
+    signer: {
+        signingAlgorithm: "v4-unsigned-body"
+    }
 });
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME;
