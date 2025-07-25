@@ -42,7 +42,7 @@ exports.generatePresignedUrl = async (req, res) => {
         await newFile.save();
 
         // 전체 경로(s3Key)를 포함하여 Presigned URL 생성
-        const command = new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, ContentType: fileType });
+        const command = new PutObjectCommand({ Bucket: BUCKET_NAME, Key: s3Key, ContentType: fileType, ChecksumAlgorithm: undefined });
         const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 300 });
 
         res.json({ presignedUrl, fileId: newFile._id });
