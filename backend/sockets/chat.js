@@ -355,6 +355,15 @@ module.exports = function(io) {
         }
 
         // 권한 체크
+
+        if (!subscribedRooms.has(roomId)) {
+          pubsub.subscribeRoom(roomId, (event, payload) => {
+            // Redis 로부터 내려온 이벤트를 방에 emit
+            io.to(roomId).emit(event, payload);
+          });
+          subscribedRooms.add(roomId);
+        }
+
         const room = await Room.findOne({
           _id: roomId,
           participants: socket.user.id
@@ -448,6 +457,9 @@ module.exports = function(io) {
 
         socket.join(roomId);
         userRooms.set(socket.user.id, roomId);
+
+        socket.data.roomId = roomId;
+        socket.data.username = socket.user.name;
 
         socket.data.roomId = roomId;
         socket.data.username = socket.user.name;
@@ -659,6 +671,14 @@ module.exports = function(io) {
             await handleAIResponse(io, room, ai, query);
           }
         }
+
+
+        await pubsub.publishMessage(
+          message.room.toString(),  // roomId
+          'message',                // event 이름
+          message                    // payload (full Message object)
+        );
+
 
         await SessionService.updateLastActivity(socket.user.id);
 
