@@ -85,11 +85,9 @@ class RedisClient {
     try {
       console.log('Connecting to Redis...');
 
-      const url = redisPassword
-        ? `redis://:${encodeURIComponent(redisPassword)}@${redisHost}:${redisPort}`
-        : `redis://${redisHost}:${redisPort}`;
       this.client = Redis.createClient({
-        url,
+        url: `redis://${redisHost}:${redisPort}`,
+        password: redisPassword,
         socket: {
           host: redisHost,
           port: redisPort,
