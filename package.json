@@ -21,8 +21,24 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@vapor-ui/core": "^0.3.1",
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.0",
+    "redis": "^5.6.0",
+    "uuid": "^11.1.0"
+  },
+  "main": "generate_code.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/100-hours-a-week/16-load-test-be.git"
+  },
+  "keywords": [],
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/100-hours-a-week/16-load-test-be/issues"
+  },
+  "homepage": "https://github.com/100-hours-a-week/16-load-test-be#readme"
     "@aws-sdk/client-s3": "^3.850.0",
     "@aws-sdk/s3-request-presigner": "^3.850.0",
-    "@vapor-ui/core": "^0.3.1"
   }
 }

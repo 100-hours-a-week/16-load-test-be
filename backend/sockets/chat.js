@@ -570,7 +570,14 @@ module.exports = function(io) {
         if (aiMentions.length > 0) {
           for (const ai of aiMentions) {
             const query = content.replace(new RegExp(`@${ai}\\b`, 'g'), '').trim();
-            await handleAIResponse(io, room, ai, query);
+            if (ai === 'davinciAI') {
+              const drawingPayload = await aiService.createDrawingPrompt(query);
+              // redis에 저장
+              // 그림 완성될 때까지 기다리기
+              // 완성되면 io.to(room).emit
+              break; // 이미지 생성은 다른 ai 불러오지 말자
+            }
+            else {await handleAIResponse(io, room, ai, query);}
           }
         }
 
@@ -929,9 +936,9 @@ module.exports = function(io) {
   function extractAIMentions(content) {
     if (!content) return [];
     
-    const aiTypes = ['wayneAI', 'consultingAI'];
+    const aiTypes = ['wayneAI', 'consultingAI', 'davinciAI'];
     const mentions = new Set();
-    const mentionRegex = /@(wayneAI|consultingAI)\b/g;
+    const mentionRegex = /@(wayneAI|consultingAI|davinciAI)\b/g;
     let match;
     
     while ((match = mentionRegex.exec(content)) !== null) {
