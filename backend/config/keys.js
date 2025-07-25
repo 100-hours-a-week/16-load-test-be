@@ -10,9 +10,12 @@ module.exports = {
   jwtSecret: process.env.JWT_SECRET,
   encryptionKey: process.env.ENCRYPTION_KEY || DEFAULT_ENCRYPTION_KEY,
   passwordSalt: process.env.PASSWORD_SALT || DEFAULT_PASSWORD_SALT,
+
   redisHost: process.env.REDIS_HOST,
   redisPort: process.env.REDIS_PORT,
-  redispassword: process.env.REDIS_PASSWORD,
+  redisPassword: process.env.REDIS_PASSWORD,
+  pubsubHost: process.env.PUBSUB_HOST,
+
   openaiApiKey: process.env.OPENAI_API_KEY,
   vectorDbEndpoint: process.env.VECTOR_DB_ENDPOINT,
 };
