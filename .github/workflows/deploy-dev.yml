@@ -45,7 +45,7 @@ jobs:
             PUBSUB_HOST: 10.0.11.63
             REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
             CLOUDFRONT_URL=https://file.goorm-ktb-016.goorm.team
-            FRONTEND_ORIGIN=chat.goorm-ktb-016.goorm.team
+            FRONTEND_ORIGIN=https://dev.goorm-ktb-016.goorm.team
             AWS_REGION=ap-northeast-2
             S3_BUCKET_NAME=ktb-bootcamp-chat-16
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
