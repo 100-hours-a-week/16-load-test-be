@@ -1,6 +1,7 @@
 const axios = require('axios');
 const { openaiApiKey } = require('../config/keys');
-const redisClient = require('../utils/redisClient');
+const airedis = require('../utils/redisBrix');
+const { randomUUID } = require('crypto');
 
 class AIService {
   constructor() {
@@ -34,7 +35,6 @@ class AIService {
         throw new Error('Unknown AI persona');
       }
 
-      // 시스템 프롬프트 생성
       const systemPrompt = `당신은 ${aiPersona.name}입니다.
 역할: ${aiPersona.role}
 특성: ${aiPersona.traits}
@@ -45,10 +45,11 @@ class AIService {
 2. 정확하지 않은 정보는 제공하지 마세요.
 3. 필요한 경우 예시를 들어 설명하세요.
 4. ${aiPersona.tone}을 유지하세요.`;
+
       callbacks.onStart();
 
       const response = await this.openaiClient.post('/chat/completions', {
-        model: 'gpt-4o',
+        model: 'gpt-4',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: message }
@@ -158,13 +159,26 @@ class AIService {
     console.log(`Generated prompt: ${promptText}`);
 
     const payload = {
-      id: `prompt-${Date.now()}`,
+      id: randomUUID(),
       userMessage,
       promptText: `MSPaint drawing of ${promptText}`,
-      createdAt: new Date().toISOString()
     };
 
     return payload;
+  }
+
+  async genimg(payload) {
+    const client = await airedis.getClient();
+    await client.rPush(`waiting:davinci`, JSON.stringify(payload));
+    const completionQueue = `completed:davinci:${payload.id}`;
+
+    const result = await client.blPop(completionQueue, 0);
+    if (!result) {
+      throw new Error('Blpop failed');
+    }
+    const img_url = result.element;
+
+    return img_url;
   }
 }
 
