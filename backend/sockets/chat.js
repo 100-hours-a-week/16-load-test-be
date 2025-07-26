@@ -662,7 +662,7 @@ module.exports = function(io) {
         await message.save();
         await message.populate([
           { path: 'sender', select: 'name email profileImage' },
-          { path: 'file', select: 'filename originalname mimetype size' }
+          { path: 'file', select: 'filename originalName mimeType size' }
         ]);
 
         io.to(room).emit('message', message);
@@ -1086,7 +1086,7 @@ module.exports = function(io) {
     const updatedFile = await File.findByIdAndUpdate(
       file._id,
       { $set: { status: 'completed', url: newUrl } },
-      { new: true, projection: 'url originalname mimetype size s3Key status' }
+      { new: true, projection: 'url originalName mimeType size s3Key status' }
     );
 
     // 3) 임시 메시지 상태 completed로 변경 (new: true로 최신 메시지 받기보단 lean 후 수동 삽입)
