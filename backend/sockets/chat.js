@@ -1036,85 +1036,96 @@ module.exports = function(io) {
     // });
 
 
-    socket.on('fileUploadComplete', async (data) => {
-  const { fileId, roomId, content } = data;
-  const userId = socket.user.id;
+  socket.on('fileUploadComplete', async (data) => {
+    const { fileId, roomId, content } = data;
+    const userId = socket.user.id;
 
-  let tempMessageId = null;
+    let tempMessageId = null;
 
-  try {
-    const file = await File.findById(fileId);
-    if (!file || file.uploader.toString() !== userId) {
-      socket.emit('error', { message: '파일 처리 권한이 없습니다.' });
-      return;
+    try {
+      const file = await File.findById(fileId);
+      if (!file || file.uploader.toString() !== userId) {
+        socket.emit('error', { message: '파일 처리 권한이 없습니다.' });
+        return;
+      }
+
+      // 1) 임시 메시지 생성 & 전송
+      const tempMessage = await new Message({
+        room: roomId,
+        sender: userId,
+        type: 'file',
+        content: content || '',
+        file: file._id,
+        readers: [{ userId, readAt: new Date() }],
+        metadata: { status: 'processing' }
+      }).save();
+
+      tempMessageId = tempMessage._id;
+
+      const populatedTempMessage = await Message.findById(tempMessageId)
+        .populate('sender', 'name profileImage')
+        .populate('file');
+
+      // io.to(roomId).emit('message', populatedTempMessage);
+      await pubsub.publishMessage(
+        roomId,                 // 어떤 채널(방)에?
+        'message',              // 어떤 종류의 소식? ('message' 이벤트 이름 그대로 사용)
+        populatedTempMessage    // 내용은? (임시 메시지 객체)
+      );
+
+      // 2) 파일 URL을 CloudFront 기준으로 업데이트
+      const cloudfrontUrl = process.env.CLOUDFRONT_URL?.trim();
+      let newUrl;
+      if (cloudfrontUrl) {
+        const publicPath = file.s3Key.startsWith('files/')
+          ? file.s3Key.substring(6)
+          : file.s3Key;
+        const cleanCloudFrontUrl = cloudfrontUrl.endsWith('/')
+          ? cloudfrontUrl.slice(0, -1)
+          : cloudfrontUrl;
+        newUrl = `${cleanCloudFrontUrl}/${publicPath}`;
+      } else {
+        newUrl = `https://s3.${process.env.AWS_REGION}.amazonaws.com/${process.env.S3_BUCKET_NAME}/${file.s3Key}`;
+      }
+
+      const updatedFile = await File.findByIdAndUpdate(
+        file._id,
+        { $set: { status: 'completed', url: newUrl } },
+        { new: true, projection: 'url originalName mimeType size s3Key status' }
+      );
+
+      // 3) 임시 메시지 상태 completed로 변경 (new: true로 최신 메시지 받기보단 lean 후 수동 삽입)
+      await Message.updateOne(
+        { _id: tempMessageId },
+        { $set: { 'metadata.status': 'completed' } }
+      );
+
+      // 4) 최종 메시지 재전송 (file을 수동으로 최신값으로 꽂아 넣음)
+      const finalMessage = await Message.findById(tempMessageId)
+        .populate('sender', 'name profileImage')
+        .lean();
+
+      finalMessage.file = updatedFile; // 최신 file 직접 삽입
+
+      // 클라이언트에서 같은 _id 메시지를 갱신하도록 별도 이벤트 사용을 권장
+      // io.to(roomId).emit('messageUpdated', finalMessage);
+
+      await pubsub.publishMessage(
+        roomId,               // 어떤 채널(방)에?
+        'messageUpdated',     // 어떤 종류의 소식? ('messageUpdated' 이벤트 이름 그대로 사용)
+        finalMessage          // 내용은? (완성된 메시지 객체)
+      );
+
+      console.log(`[Socket] 파일 메시지 최종 전송 완료: room=${roomId}, fileId=${fileId}, url=${updatedFile.url}`);
+
+    } catch (error) {
+      console.error('[Socket] Error during fileUploadComplete:', error);
+      if (tempMessageId) {
+        await Message.deleteOne({ _id: tempMessageId });
+        io.to(roomId).emit('messageDeleted', { messageId: tempMessageId });
+      }
+      socket.emit('error', { message: '서버 내부 오류로 파일 처리에 실패했습니다.' });
     }
-
-    // 1) 임시 메시지 생성 & 전송
-    const tempMessage = await new Message({
-      room: roomId,
-      sender: userId,
-      type: 'file',
-      content: content || '',
-      file: file._id,
-      readers: [{ userId, readAt: new Date() }],
-      metadata: { status: 'processing' }
-    }).save();
-
-    tempMessageId = tempMessage._id;
-
-    const populatedTempMessage = await Message.findById(tempMessageId)
-      .populate('sender', 'name profileImage')
-      .populate('file');
-
-    io.to(roomId).emit('message', populatedTempMessage);
-
-    // 2) 파일 URL을 CloudFront 기준으로 업데이트
-    const cloudfrontUrl = process.env.CLOUDFRONT_URL?.trim();
-    let newUrl;
-    if (cloudfrontUrl) {
-      const publicPath = file.s3Key.startsWith('files/')
-        ? file.s3Key.substring(6)
-        : file.s3Key;
-      const cleanCloudFrontUrl = cloudfrontUrl.endsWith('/')
-        ? cloudfrontUrl.slice(0, -1)
-        : cloudfrontUrl;
-      newUrl = `${cleanCloudFrontUrl}/${publicPath}`;
-    } else {
-      newUrl = `https://s3.${process.env.AWS_REGION}.amazonaws.com/${process.env.S3_BUCKET_NAME}/${file.s3Key}`;
-    }
-
-    const updatedFile = await File.findByIdAndUpdate(
-      file._id,
-      { $set: { status: 'completed', url: newUrl } },
-      { new: true, projection: 'url originalName mimeType size s3Key status' }
-    );
-
-    // 3) 임시 메시지 상태 completed로 변경 (new: true로 최신 메시지 받기보단 lean 후 수동 삽입)
-    await Message.updateOne(
-      { _id: tempMessageId },
-      { $set: { 'metadata.status': 'completed' } }
-    );
-
-    // 4) 최종 메시지 재전송 (file을 수동으로 최신값으로 꽂아 넣음)
-    const finalMessage = await Message.findById(tempMessageId)
-      .populate('sender', 'name profileImage')
-      .lean();
-
-    finalMessage.file = updatedFile; // 최신 file 직접 삽입
-
-    // 클라이언트에서 같은 _id 메시지를 갱신하도록 별도 이벤트 사용을 권장
-    io.to(roomId).emit('messageUpdated', finalMessage);
-
-    console.log(`[Socket] 파일 메시지 최종 전송 완료: room=${roomId}, fileId=${fileId}, url=${updatedFile.url}`);
-
-  } catch (error) {
-    console.error('[Socket] Error during fileUploadComplete:', error);
-    if (tempMessageId) {
-      await Message.deleteOne({ _id: tempMessageId });
-      io.to(roomId).emit('messageDeleted', { messageId: tempMessageId });
-    }
-    socket.emit('error', { message: '서버 내부 오류로 파일 처리에 실패했습니다.' });
-  }
 });
 
 
